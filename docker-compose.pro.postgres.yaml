@@ -1,0 +1,85 @@
+version: '3.8'
+
+# yaml refs
+x-refs:
+  common_config: &common_config
+    restart: always
+    env_file:
+    - .env
+    
+services:
+  pg-0:
+    image: 'bitnami/postgresql:12'
+    ports:
+      - '5432'
+    volumes:
+      - 'postgresql_master_data:/bitnami/postgresql'
+      - ./conf/:/opt/bitnami/postgresql/conf/conf.d/
+    environment:
+      POSTGRESQL_REPLICATION_MODE: master
+      POSTGRESQL_REPLICATION_USER: repl_user
+      POSTGRESQL_REPLICATION_PASSWORD: repl_password
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: custompassword
+      POSTGRESQL_DATABASE: customdatabase
+
+  pg-1:
+    image: 'bitnami/postgresql:12'
+    ports:
+      - '5432'
+    volumes:
+      - 'postgresql_slave_data:/bitnami/postgresql'
+      - ./conf/:/opt/bitnami/postgresql/conf/conf.d/
+    depends_on:
+      - pg-0
+    environment:
+      POSTGRESQL_REPLICATION_MODE: slave
+      POSTGRESQL_REPLICATION_USER: repl_user
+      POSTGRESQL_REPLICATION_PASSWORD: repl_password
+      POSTGRESQL_MASTER_HOST: pg-0
+      POSTGRESQL_PASSWORD: custompassword
+      POSTGRESQL_MASTER_PORT_NUMBER: 5432
+
+  pg-2:
+    image: 'bitnami/postgresql:12'
+    ports:
+      - '5432'
+    volumes:
+      - 'postgresql_slave2_data:/bitnami/postgresql'
+      - ./conf/:/opt/bitnami/postgresql/conf/conf.d/
+    depends_on:
+      - pg-0
+    environment:
+      POSTGRESQL_REPLICATION_MODE: slave
+      POSTGRESQL_REPLICATION_USER: repl_user
+      POSTGRESQL_REPLICATION_PASSWORD: repl_password
+      POSTGRESQL_MASTER_HOST: pg-0
+      POSTGRESQL_PASSWORD: custompassword
+      POSTGRESQL_MASTER_PORT_NUMBER: 5432
+
+  data:
+    <<: *common_config
+    image: hasuraci/graphql-engine-pro:v1.2.1-pro.1
+    volumes:
+      - ./data/migrations:/hasura-migrations
+      - ./data/metadata:/hasura-metadata
+    ports:
+      - "8080:8080"
+    environment:
+      HASURA_GRAPHQL_READ_REPLICA_URLS: postgres://postgres:custompassword@pg-1:5432/customdatabase,postgres://postgres:custompassword@pg-2:5432/customdatabase
+      # HASURA_GRAPHQL_READ_REPLICA_URLS: postgres://postgres:custompassword@pg-0:5432/customdatabase,postgres://postgres:custompassword@pg-1:5432/customdatabase
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:custompassword@pg-0:5432/customdatabase
+      # HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:custompassword@pg-0,pg-1:5432/customdatabase
+      HASURA_GRAPHQL_MIGRATIONS_DIR: "/hasura-migrations"
+      HASURA_GRAPHQL_METADATA_DIR: "/hasura-metadata"
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"  
+      HASURA_GRAPHQL_LOG_LEVEL: "debug"
+      HASURA_GRAPHQL_DEV_MODE: "true"    
+
+volumes:
+  postgresql_master_data:
+    driver: local
+  postgresql_slave_data:
+    driver: local
+  postgresql_slave2_data:
+    driver: local

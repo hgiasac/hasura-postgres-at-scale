@@ -1,0 +1,66 @@
+version: '3'
+
+services:
+  pg-0:
+    image: 'bitnami/postgresql-repmgr:12'
+    ports:
+      - '5432'
+    volumes:
+      - 'postgresql_master_data:/bitnami/postgresql'
+      - ./conf/:/opt/bitnami/postgresql/conf/conf.d/
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: adminpassword
+      POSTGRESQL_USERNAME: customuser
+      POSTGRESQL_PASSWORD: custompassword
+      POSTGRESQL_DATABASE: customdatabase
+      REPMGR_PASSWORD: repmgrpassword
+      REPMGR_PRIMARY_HOST: pg-0
+      REPMGR_PRIMARY_PORT: 5432
+      REPMGR_PARTNER_NODES: pg-0,pg-1:5432
+      REPMGR_NODE_NAME: pg-0
+      REPMGR_NODE_NETWORK_NAME: pg-0
+      REPMGR_PORT_NUMBER: 5432
+      REPMGR_LOG_LEVEL: INFO
+
+  pg-1:
+    image: 'bitnami/postgresql-repmgr:12'
+    ports:
+      - '5432'
+    volumes:
+      - 'postgresql_slave_data:/bitnami/postgresql'
+      - ./conf/:/opt/bitnami/postgresql/conf/conf.d/
+    environment:
+      POSTGRESQL_POSTGRES_PASSWORD: adminpassword
+      POSTGRESQL_USERNAME: customuser
+      POSTGRESQL_PASSWORD: custompassword
+      POSTGRESQL_DATABASE: customdatabase
+      REPMGR_PASSWORD: repmgrpassword
+      REPMGR_PRIMARY_HOST: pg-0
+      REPMGR_PRIMARY_PORT: 5432
+      REPMGR_PARTNER_NODES: pg-0,pg-1:5432
+      REPMGR_NODE_NAME: pg-1
+      REPMGR_NODE_NETWORK_NAME: pg-1
+      REPMGR_PORT_NUMBER: 5432
+      REPMGR_LOG_LEVEL: INFO
+
+  data:
+    image: hasura/graphql-engine:v1.2.1.cli-migrations-v2
+    volumes:
+      - ./data/migrations:/hasura-migrations
+      - ./data/metadata:/hasura-metadata
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:adminpassword@pg-0,pg-1:5432/customdatabase
+      HASURA_GRAPHQL_MIGRATIONS_DIR: "/hasura-migrations"
+      HASURA_GRAPHQL_METADATA_DIR: "/hasura-metadata"
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"  
+      HASURA_GRAPHQL_LOG_LEVEL: "debug"
+      HASURA_GRAPHQL_DEV_MODE: "true"    
+
+volumes:
+  postgresql_master_data:
+    driver: local
+  postgresql_slave_data:
+    driver: local

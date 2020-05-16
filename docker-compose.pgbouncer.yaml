@@ -1,0 +1,49 @@
+version: '3'
+
+services:
+  pg-0:
+    image: 'bitnami/postgresql:12'
+    ports:
+      - '5432'
+    volumes:
+      - 'postgresql_master_data:/bitnami/postgresql'
+      - ./conf/:/opt/bitnami/postgresql/conf/conf.d/
+    environment:
+      POSTGRESQL_USERNAME: postgres
+      POSTGRESQL_PASSWORD: custompassword
+      POSTGRESQL_DATABASE: customdatabase
+
+  data:
+    image: hasura/graphql-engine:v1.2.1.cli-migrations-v2
+    volumes:
+      - ./data/migrations:/hasura-migrations
+      - ./data/metadata:/hasura-metadata
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://postgres:adminpassword@pgbouncer:5432/customdatabase
+      HASURA_GRAPHQL_MIGRATIONS_DIR: "/hasura-migrations"
+      HASURA_GRAPHQL_METADATA_DIR: "/hasura-metadata"
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"  
+      HASURA_GRAPHQL_LOG_LEVEL: "debug"
+      HASURA_GRAPHQL_DEV_MODE: "true"    
+  
+  pgbouncer:
+    image: edoburu/pgbouncer
+    restart: always
+    depends_on:
+    - pg-0
+    ports:
+      - "5432:5432"
+    environment:
+      DATABASE_URL: postgres://postgres:adminpassword@pg-0:5432/customdatabase
+      POOL_MODE: session
+      MAX_CLIENT_CONN: 100
+
+
+volumes:
+  postgresql_master_data:
+    driver: local
+  postgresql_slave_data:
+    driver: local
