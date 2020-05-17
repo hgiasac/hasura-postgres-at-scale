@@ -43,16 +43,19 @@ This test categorizes into 2 versions: Hasura Core (OSS) and Read Replica on Has
 
 This is summary features table of Postgres replication with Hasura 
 
-| System                                    | Load balancing     | Auto-failover                                                         | Complexity  |
-| ----------------------------------------- | ------------------ | --------------------------------------------------------------------- | ----------- |
-| Streaming Replication                     | :x:                | :x:                                                                   | Simple      |
-| Streaming Replication + Hasura Pro        | :heavy_check_mark: | :x:                                                                   | Simple      |
-| repmgr                                    | :x:                | :heavy_check_mark:                                                    | Simple      |
-| repmgr + Hasura Pro                       | :heavy_check_mark: | :heavy_check_mark: (3 nodes)                                          | Simple      |
-| PgBouncer                                 | :x:                | :x:                                                                   | Simple      |
-| PgBouncer + Hasura Pro                    | :heavy_check_mark: | :x:                                                                   | Simple      |
-| PgPool                                    | :heavy_check_mark: | :heavy_check_mark: (with extra components: repmgr, docker/kubernetes) | Complicated |
-| HAProxy + PgBouncer + (xinetd or Patroni) | :heavy_check_mark: | :heavy_check_mark:                                                    | Complicated |
+| System                                    | Load balancing                                        | Auto-failover                                             | Difficulty                                |
+| ----------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------- |
+| Streaming Replication                     | <p style="text-align: center;">:x:</p>                | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
+| Streaming Replication + Hasura Pro        | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
+| repmgr                                    | <p style="text-align: center;">:x:</p>                | <p style="text-align: center;">:heavy_check_mark:</p>     | <p style="text-align: center;">Easy</p>   |
+| repmgr + Hasura Pro                       | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark: (*)</p> | <p style="text-align: center;">Easy</p>   |
+| PgBouncer                                 | <p style="text-align: center;">:x:</p>                | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
+| PgBouncer + Hasura Pro                    | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
+| PgPool                                    | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark:(*)</p>  | <p style="text-align: center;">Medium</p> |
+| HAProxy + PgBouncer + (xinetd or Patroni) | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark:</p>     | <p style="text-align: center;">Hard</p>   |
+
+(*): work well with 3 nodes
+(**): with extra components: repmgr, docker/kubernetes
 
 - If you use cloud SQL services (Google Cloud, Amazon Web Services, Azure...), or you don't care about auto-failover. `Streaming Replication + Hasura Pro` is best performance with load balancing. For Hasura Core, the workaround is using 2 Hasura instances that connect to each Postgres server. Read-only apps will use standby Hasura, or use 2 read and write GraphQL clients, and select correct client according to `query`, `subscription` (read) and `mutation` (write) requests .You can optionally use PgBouncer if your application need many concurrent connections.
 - If you deploy on premise server, and high-availability is critical, `repmgr + Streaming Replication + Hasura Pro` can solve both auto-failover and load balancing problem. For Hasura Core, it's also possible with `PgPool`, `Hatroni + HAProxy + PgBouncer` setup. However, the downside is more complicated to deploy, with extra server cost that isn't cheaper than Hasura Pro's Read replica solution.
