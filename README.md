@@ -5,6 +5,7 @@ This is the test experiment of several popular PostgreSQL replication setup to k
 This test categorizes into 2 versions: Hasura Core (OSS) and Read Replica on Hasura Pro
 
 - [Scaling and auto-failover Hasura with PostgreSQL](#scaling-and-auto-failover-hasura-with-postgresql)
+  - [TLDR](#tldr)
   - [Built-in Hasura features](#built-in-hasura-features)
     - [Failover multi-hosts connections](#failover-multi-hosts-connections)
     - [Read Replica](#read-replica)
@@ -25,12 +26,38 @@ This test categorizes into 2 versions: Hasura Core (OSS) and Read Replica on Has
       - [1 Master - 2 Standby](#1-master---2-standby)
       - [Conclusion](#conclusion-3)
     - [When to use](#when-to-use-1)
-  - [PGBouncer](#pgbouncer)
+  - [PgBouncer](#pgbouncer)
     - [Hasura Core](#hasura-core-2)
       - [Use case](#use-case)
     - [Hasura Pro](#hasura-pro-2)
       - [Conclusion](#conclusion-4)
     - [When to use](#when-to-use-2)
+  - [PgPool II](#pgpool-ii)
+    - [Load Balancing](#load-balancing)
+    - [Auto-failover](#auto-failover)
+      - [Use cases](#use-cases-3)
+      - [What's wrong with PgPool?](#whats-wrong-with-pgpool)
+    - [Conclusion](#conclusion-5)
+
+## TLDR
+
+This is summary features table of Postgres replication with Hasura 
+
+| System                                    | Load balancing     | Auto-failover                                                         | Complexity  |
+| ----------------------------------------- | ------------------ | --------------------------------------------------------------------- | ----------- |
+| Streaming Replication                     | :x:                | :x:                                                                   | Simple      |
+| Streaming Replication + Hasura Pro        | :heavy_check_mark: | :x:                                                                   | Simple      |
+| repmgr                                    | :x:                | :heavy_check_mark:                                                    | Simple      |
+| repmgr + Hasura Pro                       | :heavy_check_mark: | :heavy_check_mark: (3 nodes)                                          | Simple      |
+| PgBouncer                                 | :x:                | :x:                                                                   | Simple      |
+| PgBouncer + Hasura Pro                    | :heavy_check_mark: | :x:                                                                   | Simple      |
+| PgPool                                    | :heavy_check_mark: | :heavy_check_mark: (with extra components: repmgr, docker/kubernetes) | Complicated |
+| HAProxy + PgBouncer + (xinetd or Patroni) | :heavy_check_mark: | :heavy_check_mark:                                                    | Complicated |
+
+- If you use cloud SQL services (Google Cloud, Amazon Web Services, Azure...), or you don't care about auto-failover. `Streaming Replication + Hasura Pro` is best performance with load balancing. For Hasura Core, the workaround is using 2 Hasura instances that connect to each Postgres server. Read-only apps will use standby Hasura, or use 2 read and write GraphQL clients, and select correct client according to `query`, `subscription` (read) and `mutation` (write) requests .You can optionally use PgBouncer if your application need many concurrent connections.
+- If you deploy on premise server, and high-availability is critical, `repmgr + Streaming Replication + Hasura Pro` can solve both auto-failover and load balancing problem. For Hasura Core, it's also possible with `PgPool`, `Hatroni + HAProxy + PgBouncer` setup. However, the downside is more complicated to deploy, with extra server cost that isn't cheaper than Hasura Pro's Read replica solution.
+
+Below sections are detail experiments with multiple replication setups.
 
 ## Built-in Hasura features
 
@@ -81,7 +108,7 @@ Streaming replication in PostgreSQL works on log shipping. Every transaction in 
 
 **Cons**
 - Doesn't support auto-failover. Database admin have to switch manually
-- Multi-host connections are bad choice. Hasura will be stuck at slave node if master node is downed 
+- Multi-host connections are bad choice. Hasura will be stuck at slave node if master node is down
 
 ### Hasura Pro
 - Set `pg-1`, `pg-2` as read replica  
@@ -103,7 +130,7 @@ Streaming replication in PostgreSQL works on log shipping. Every transaction in 
 
 **4. add pg-0 as second read replica, then stop pg-1**
 
-- My expectation is, if `pg-1` is downed, `pg-0` will take both role read and write. However, Hasura Pro only runs several queries then get hanging. There is conflict between repeat read and read-write ISOLATION LEVEL 
+- My expectation is, if `pg-1` is down, `pg-0` will take both role read and write. However, Hasura Pro only runs several queries then get hanging. There is conflict between repeat read and read-write ISOLATION LEVEL 
 
 #### Conclusion
 
@@ -212,17 +239,17 @@ Because Hasura Pro can switch back correct read replica, we can try with 1 Maste
 
 Auto-failover is critical on on-prem infrastructure, although Docker/Kubernetes system has auto-restart policy to reduce downtime. Read-replica works well with `repmgr`, but it is safer with 2 or more standby nodes.
 
-## PGBouncer 
+## PgBouncer 
 
-PostgrPGBouncer is used as lightweight connection pooler proxy over es. It doesn't have built-in support load balancing multiple servers or failover. We have to setup complex extensions to support them ([patroni](https://github.com/zalando/patroni), [HAProxy](http://www.haproxy.org/)...) 
+PgBouncer is used as lightweight connection pooler proxy over es. It doesn't have built-in support load balancing multiple servers or failover. We have to setup complex extensions to support them ([patroni](https://github.com/zalando/patroni), [HAProxy](http://www.haproxy.org/)...) 
 
 ![pgbouncer](static/pgbouncer.png)
 
-How about `PGBouncer` + `repmgr`? I setup this combo to see if it works 
+How about `PgBouncer` + `repmgr`? I setup this combo to see if it works 
 
 - Replication type: master-standby
 - Cluster setup: 1 master `pg-0`, 1 slave `pg-1`
-- PGBouncer setup: 2 nodes, connect to `pg-0`, `pg-1` accordingly
+- PgBouncer setup: 2 nodes, connect to `pg-0`, `pg-1` accordingly
 
 ### Hasura Core
 
@@ -242,7 +269,7 @@ How about `PGBouncer` + `repmgr`? I setup this combo to see if it works
 
 ### Hasura Pro
 
-The behavior is similar. Hasura can't know when postgres server is stopped because it connects though PGBouncer proxy 
+The behavior is similar. Hasura can't know when postgres server is stopped because it connects though PgBouncer proxy 
 
 #### Conclusion
 
@@ -259,4 +286,91 @@ This architecture aren't suitable for failover connection of Hasura Core
   
 ### When to use
 
-PGBouncer can extends current streaming replication architecture, and you don't care about auto-failover or combine with advanced auto-failover and load balancer setup.
+PgBouncer can extends current streaming replication architecture, and you don't care about auto-failover or combine with advanced auto-failover and load balancer setup.
+
+## PgPool II
+
+PgPool-II is a proxy software that sits between PostgreSQL servers. It seems like all-in-one solution:
+- Connection Pooling
+- Load Balancing
+- Automated fail over
+- Online Recovery
+- Replication
+- Limiting Exceeding Connections
+- Watchdog
+- In Memory Query Cache
+ 
+At early look, PgPool can replace read-replica of Hasura Pro because of Load Balancing. So let's try some experiment.
+
+Setup:
+- 1 master `pg-0`, 1 standby `pg-1`
+- PgPool image: https://github.com/bitnami/bitnami-docker-pgpool
+- Configuration: `docker-compose.pgpool.yaml`
+
+![pgpool](static/pgpool.png)
+
+### Load Balancing 
+
+After all services started up, I run some read queries. However, all queries are executed at master `pg-0` node only.
+
+| node_id | hostname | port | status | lb_weight | role    | select_cnt | load_balance_node | replication_delay | replication_state | replication_sync_state | last_status_change  |
+| ------- | -------- | ---- | ------ | --------- | ------- | ---------- | ----------------- | ----------------- | ----------------- | ---------------------- | ------------------- |
+| 0       | pg-0     | 5432 | up     | 0.500000  | primary | 82         | false             | 0                 |                   |                        | 2020-05-16 18:54:06 |
+| 1       | pg-1     | 5432 | up     | 0.500000  | standby | 0          | true              | 0                 |                   |                        | 2020-05-16 18:55:02 |
+
+Why? First of all, pgpool-II' load balancing is "session base", not "statement base". That means, DB node selection for load balancing is decided at the beginning of session. So all SQL statements are sent to the same DB node until the session ends.([PGPool FAQ](https://www.pgpool.net/mediawiki/index.php/FAQ))
+
+In this case, because Hasura create long-live connection pool at startup, so it connects to `pg-0` first. All queries on these connections are go through master. It is different with Read-replica that connects to master and slave node at once, then load balancing through read-write policy logic.
+
+Therefore, we need to increase more connections to utilize PgPool Load Balancing. I run load test with 100 queries/second, and fortunately, load balancing work well.
+
+| node_id | hostname | port | status | lb_weight | role    | select_cnt | load_balance_node | replication_delay | replication_state | replication_sync_state | last_status_change  |
+| ------- | -------- | ---- | ------ | --------- | ------- | ---------- | ----------------- | ----------------- | ----------------- | ---------------------- | ------------------- |
+| 0       | pg-0     | 5432 | up     | 0.500000  | primary | 2621       | false             | 0                 |                   |                        | 2020-05-17 04:27:21 |
+| 1       | pg-1     | 5432 | up     | 0.500000  | standby | 3076       | true              | 0                 |                   |                        | 2020-05-17 04:27:21 |
+
+PgPool loads balancing read queries into all master and standby nodes. The priority depends on `lb_weight`. To simulate similar read-replica on Hasura Pro, you can set low `lb_weight` on master. 
+
+### Auto-failover 
+
+#### Use cases
+
+**1. Stop master pg-0**
+
+- `repmgr` automatically switches standby (pg-1) to master
+- PGPool route `pg-1` as master node. Hasura reconnect and continue to work
+
+**2. Start pg-0**
+
+- `pg-0` becomes standby node.
+- However, PGPool doesn't reload `pg-0` online status. `show pool_nodes` still show `down`. It is expected behavior (FAQ)
+
+**3. Stop pg-1**
+
+- `pg-0` becomes master
+- PGPool thinks all backend nodes are down, and stop working. It needs to be restarted or manually re-attach nodes to reload.
+
+#### What's wrong with PgPool?
+
+This is expected behavior of PgPool.
+
+> [Why does not Pgpool-II automatically recognize a database comes back online?](https://www.pgpool.net/mediawiki/index.php/FAQ)
+> It would be technically possible but we don't think it's a safe feature.
+> Consider a streaming replication configuration. When a standby comes back online, it does not necessarily means it connects to the current primary node. It may connect to a different primary node , or even it's not a standby any more. If Pgpool-II automatically recognizes such that standby as online, SELECTs to the standby node will return different result as the primary, which is a disaster for database applications.
+> Also please note that "pgpool reload" does not do anything for recognizing the standby node as online. It just reloads configuration files.
+> Please note that in Pgpool-II 4.1 or later, it is possible to automatically make a standby server online if it's safe enough. See configuration parameter "auto_failback" for more information.
+
+So, in default PgPool doesn't reload online status. New configuration to support `auto_failback` is only available from PgPool 4.1. Before that, DBA engineers use several workaround such as restart PgPool container/pod policy using health check on Docker/Kubernetes. The downside is client connection are disconnected. 
+
+### Conclusion
+
+PgPool is a alternative for Read-replica on Hasura Pro. However, DBA needs to understand how it works. Moreover, PgPool also needs to scale or performance and single point of failure will be potential issue. 
+
+**Pros**
+- All in one Connection Pooling and Load balancer
+- Alternative to Read-replica
+
+**Cons**
+- Need more work to setup and configure.
+- PgPool instances also need scaling to avoid single point of failure. Server cost isn't cheaper than Hasura Pro pricing at scale. 
+- Auto-failover is tricky. Need advanced infrastructure setup with Docker/Kubernetes to ensure high availability.
