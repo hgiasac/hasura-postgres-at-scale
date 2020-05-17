@@ -51,11 +51,14 @@ This is summary features table of Postgres replication with Hasura
 | repmgr + Hasura Pro                       | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark: (*)</p> | <p style="text-align: center;">Easy</p>   |
 | PgBouncer                                 | <p style="text-align: center;">:x:</p>                | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
 | PgBouncer + Hasura Pro                    | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
-| PgPool                                    | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark:(*)</p>  | <p style="text-align: center;">Medium</p> |
+| PgPool                                    | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark:(**)</p> | <p style="text-align: center;">Medium</p> |
 | HAProxy + PgBouncer + (xinetd or Patroni) | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark:</p>     | <p style="text-align: center;">Hard</p>   |
 
-(*): work well with 3 nodes
-(**): with extra components: repmgr, docker/kubernetes
+------------------------------------------
+
+(*): work well with 3 nodes.
+
+(**): with extra components: repmgr, docker/kubernetes.
 
 - If you use cloud SQL services (Google Cloud, Amazon Web Services, Azure...), or you don't care about auto-failover. `Streaming Replication + Hasura Pro` is best performance with load balancing. For Hasura Core, the workaround is using 2 Hasura instances that connect to each Postgres server. Read-only apps will use standby Hasura, or use 2 read and write GraphQL clients, and select correct client according to `query`, `subscription` (read) and `mutation` (write) requests .You can optionally use PgBouncer if your application need many concurrent connections.
 - If you deploy on premise server, and high-availability is critical, `repmgr + Streaming Replication + Hasura Pro` can solve both auto-failover and load balancing problem. For Hasura Core, it's also possible with `PgPool`, `Hatroni + HAProxy + PgBouncer` setup. However, the downside is more complicated to deploy, with extra server cost that isn't cheaper than Hasura Pro's Read replica solution.
@@ -71,8 +74,10 @@ Because Hasura GraphQL Engine uses low level `libpq` library binding, it support
 ### Read Replica
 
 This is cool feature of Hasura Pro that supports load balancing between Master and Standby replica. All write queries are executed on Master, and read query (query, subscription) are executed on Standby node. Moreover, Hasura Pro can load balancing multiple standby nodes, therefore we can horizontally scale read queries. 
-  
-![read-replica](static/read-replica.png)
+
+<p align="center">
+  <img src="static/read-replica.png">
+</p>
 
 In this article, I will test read-replica using `Hasura Pro v1.2.1-pro.1` version 
 
@@ -155,7 +160,9 @@ This solution is suitable for backup, or use standby node as a read-only databas
 
 repmgr is an open-source tool suite for managing replication and failover in a cluster of PostgreSQL servers. It enhances PostgreSQL's built-in hot-standby capabilities with tools to set up standby servers, monitor replication, and perform administrative tasks such as failover or manual switchover operations. 
 
-![repmgr](static/repmgr.png)
+<p align="center">
+  <img src="static/repmgr.png">
+</p>
 
 - Replication type: master-standby
 - Cluster setup: 1 master `pg-0`, 1 slave `pg-1`
@@ -211,7 +218,9 @@ On first time, auto-failover schedule is slow (about 3 minutes). Later times are
 
 #### 1 Master - 2 Standby
 
-![repmgr-pro](static/repmgr-pro.png)
+<p align="center">
+  <img src="static/repmgr-pro.png">
+</p>
 
 Because Hasura Pro can switch back correct read replica, we can try with 1 Master + 2 Standby setup
 
@@ -246,7 +255,9 @@ Auto-failover is critical on on-prem infrastructure, although Docker/Kubernetes 
 
 PgBouncer is used as lightweight connection pooler proxy over es. It doesn't have built-in support load balancing multiple servers or failover. We have to setup complex extensions to support them ([patroni](https://github.com/zalando/patroni), [HAProxy](http://www.haproxy.org/)...) 
 
-![pgbouncer](static/pgbouncer.png)
+<p align="center">
+  <img src="static/pgbouncer.png">
+</p>
 
 How about `PgBouncer` + `repmgr`? I setup this combo to see if it works 
 
@@ -310,7 +321,9 @@ Setup:
 - PgPool image: https://github.com/bitnami/bitnami-docker-pgpool
 - Configuration: `docker-compose.pgpool.yaml`
 
-![pgpool](static/pgpool.png)
+<p align="center">
+  <img src="static/pgpool.png">
+</p>
 
 ### Load Balancing 
 
