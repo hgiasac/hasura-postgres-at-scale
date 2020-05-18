@@ -46,11 +46,11 @@ This is summary features table of Postgres replication with Hasura
 | System                                    | Load balancing                                        | Auto-failover                                             | Difficulty                                |
 | ----------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------- |
 | Streaming Replication                     | <p style="text-align: center;">:x:</p>                | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
-| Streaming Replication + Hasura Pro        | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
+| Streaming Replication + Hasura Pro        | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">Read</p>                   | <p style="text-align: center;">Easy</p>   |
 | repmgr                                    | <p style="text-align: center;">:x:</p>                | <p style="text-align: center;">:heavy_check_mark:</p>     | <p style="text-align: center;">Easy</p>   |
 | repmgr + Hasura Pro                       | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark: (*)</p> | <p style="text-align: center;">Easy</p>   |
 | PgBouncer                                 | <p style="text-align: center;">:x:</p>                | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
-| PgBouncer + Hasura Pro                    | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:x:</p>                    | <p style="text-align: center;">Easy</p>   |
+| PgBouncer + Hasura Pro                    | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">Read</p>                   | <p style="text-align: center;">Easy</p>   |
 | PgPool                                    | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark:(**)</p> | <p style="text-align: center;">Medium</p> |
 | HAProxy + PgBouncer + (xinetd or Patroni) | <p style="text-align: center;">:heavy_check_mark:</p> | <p style="text-align: center;">:heavy_check_mark:</p>     | <p style="text-align: center;">Hard</p>   |
 
