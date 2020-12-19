@@ -14,7 +14,7 @@ services:
       POSTGRESQL_DATABASE: customdatabase
 
   data:
-    image: hasura/graphql-engine:v1.2.1.cli-migrations-v2
+    image: hasura/graphql-engine:v1.3.3.cli-migrations-v2
     volumes:
       - ./data/migrations:/hasura-migrations
       - ./data/metadata:/hasura-metadata

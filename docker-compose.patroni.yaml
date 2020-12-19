@@ -1,0 +1,115 @@
+# docker compose file for running a 3-node PostgreSQL cluster
+# with 3-node etcd cluster as the DCS and one haproxy node
+version: "3"
+
+x-refs:
+  common_patroni: &common_patroni
+    image: patroni
+    restart: always
+    networks: [ demo ]
+    env_file:
+    - .env
+    
+networks:
+  demo:
+
+services:
+  etcd1: &etcd
+    image: patroni
+    networks: [ demo ]
+    environment:
+      ETCD_LISTEN_PEER_URLS: http://0.0.0.0:2380
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_INITIAL_CLUSTER: etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      ETCD_INITIAL_CLUSTER_STATE: new
+      ETCD_INITIAL_CLUSTER_TOKEN: tutorial
+    container_name: demo-etcd1
+    hostname: etcd1
+    command: etcd -name etcd1 -initial-advertise-peer-urls http://etcd1:2380
+
+  etcd2:
+    <<: *etcd
+    container_name: demo-etcd2
+    hostname: etcd2
+    command: etcd -name etcd2 -initial-advertise-peer-urls http://etcd2:2380
+
+  etcd3:
+    <<: *etcd
+    container_name: demo-etcd3
+    hostname: etcd3
+    command: etcd -name etcd3 -initial-advertise-peer-urls http://etcd3:2380
+
+  haproxy:
+    <<: *common_patroni
+    hostname: haproxy
+    container_name: demo-haproxy
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    command: haproxy
+    environment: &haproxy_env
+      ETCDCTL_ENDPOINTS: http://etcd1:2379,http://etcd2:2379,http://etcd3:2379
+      PATRONI_ETCD3_HOSTS: "'etcd1:2379','etcd2:2379','etcd3:2379'"
+      PATRONI_SCOPE: demo
+
+  patroni1:
+    <<: *common_patroni
+    hostname: patroni1
+    container_name: demo-patroni1
+    environment:
+        <<: *haproxy_env
+        PATRONI_NAME: patroni1
+
+  patroni2:
+    <<: *common_patroni
+    hostname: patroni2
+    container_name: demo-patroni2
+    environment:
+        <<: *haproxy_env
+        PATRONI_NAME: patroni2
+
+  patroni3:
+    <<: *common_patroni
+    hostname: patroni3
+    container_name: demo-patroni3
+    environment:
+        <<: *haproxy_env
+        PATRONI_NAME: patroni3
+
+  data:
+    image: hasura/graphql-engine:v1.3.2.cli-migrations-v2
+    volumes:
+      - ./data/migrations:/hasura-migrations
+      - ./data/metadata:/hasura-metadata
+    ports:
+      - "8080:8080"
+    depends_on:
+    - haproxy
+    networks: [ demo ]
+    env_file:
+    - .env
+    restart: always
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://${PATRONI_SUPERUSER_USERNAME}:${PATRONI_SUPERUSER_PASSWORD}@haproxy:5000/postgres
+      HASURA_GRAPHQL_MIGRATIONS_DIR: "/hasura-migrations"
+      HASURA_GRAPHQL_METADATA_DIR: "/hasura-metadata"
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"  
+      HASURA_GRAPHQL_LOG_LEVEL: "debug"
+      HASURA_GRAPHQL_DEV_MODE: "true"    
+
+  readonly:
+    image: hasura/graphql-engine:v1.3.2-readonly
+    ports:
+      - "8081:8080"
+    depends_on:
+    - haproxy
+    networks: [ demo ]
+    env_file:
+    - .env
+    restart: always
+    environment:
+      HASURA_GRAPHQL_DATABASE_URL: postgres://${PATRONI_SUPERUSER_USERNAME}:${PATRONI_SUPERUSER_PASSWORD}@haproxy:5001/postgres
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"  
+      HASURA_GRAPHQL_LOG_LEVEL: "debug"
+      HASURA_GRAPHQL_DEV_MODE: "true"   
+      HASURA_GRAPHQL_CONSOLE_ASSETS_DIR: "/srv/console-assets" 

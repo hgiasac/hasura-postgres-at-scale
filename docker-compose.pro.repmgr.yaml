@@ -51,7 +51,7 @@ services:
 
   data:
     <<: *common_config
-    image: hasuraci/graphql-engine-pro:v1.2.1-pro.1
+    image: hasuraci/graphql-engine-pro:v1.3.3-pro.2
     volumes:
       - ./data/migrations:/hasura-migrations
       - ./data/metadata:/hasura-metadata
