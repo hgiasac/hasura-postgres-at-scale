@@ -17,6 +17,6 @@
     "graphql": "^15.4.0",
     "node-fetch": "^2.6.1",
     "subscriptions-transport-ws": "^0.9.18",
-    "ws": "^7.4.1"
+    "ws": "^7.4.6"
   }
 }
